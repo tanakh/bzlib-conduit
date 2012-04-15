@@ -1,0 +1,6 @@
+*~
+*.o
+*.hi
+dist/
+cabal-dev/
+cbits/bzip2-1.0.6/

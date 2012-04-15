@@ -1,0 +1,48 @@
+name:                bzlib-conduit
+version:             0.1.0.0
+synopsis:            Streaming compression/decompression via conduits.
+description:         Streaming compression/decompression via conduits.
+homepage:            http://tanakh.jp
+license:             BSD3
+license-file:        LICENSE
+author:              Hideyuki Tanaka
+maintainer:          tanaka.hideyuki@gmail.com
+copyright:           (c) 2012, Hideyuki Tanaka
+category:            Codec
+build-type:          Simple
+cabal-version:       >=1.8
+
+data-files:          test/*.bz2
+
+library
+  exposed-modules:     Data.Conduit.BZlib
+  other-modules:       Data.Conduit.BZlib.Internal
+
+  build-depends:       base == 4.*
+                     , bytestring == 0.9.*
+                     , mtl == 2.*
+                     , conduit == 0.4.*
+                     , resourcet
+                     , data-default
+                     , bindings-DSL
+
+  include-dirs:        cbits
+  install-includes:    bzlib.h
+  c-sources:           cbits/blocksort.c
+                       cbits/huffman.c
+                       cbits/crctable.c
+                       cbits/randtable.c
+                       cbits/compress.c
+                       cbits/decompress.c
+                       cbits/bzlib.c
+
+test-suite test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             test.hs
+  build-depends:       base == 4.*
+                     , bytestring == 0.9.*
+                     , hspec == 1.0.*
+                     , HUnit
+                     , conduit == 0.4.*
+                     , bzlib-conduit
