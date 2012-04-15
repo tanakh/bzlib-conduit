@@ -91,19 +91,20 @@ decompress
 decompress param = do
   (_, ptr) <- lift $ allocate malloc free
   (_, outbuf) <- lift $ allocate (mallocBytes bufSize) free
-  liftIO $ do
-    poke (p'bz_stream'next_in ptr) nullPtr
-    poke (p'bz_stream'avail_in ptr) 0
-    poke (p'bz_stream'total_in_lo32 ptr) 0
-    poke (p'bz_stream'total_in_hi32 ptr) 0
-    poke (p'bz_stream'next_out ptr) outbuf
-    poke (p'bz_stream'avail_out ptr) (fromIntegral bufSize)
-    poke (p'bz_stream'total_out_lo32 ptr) 0
-    poke (p'bz_stream'total_out_hi32 ptr) 0
-    poke (p'bz_stream'state ptr) nullPtr
-    poke (p'bz_stream'bzalloc ptr) nullPtr
-    poke (p'bz_stream'bzfree ptr) nullPtr
-    poke (p'bz_stream'opaque ptr) nullPtr
+  liftIO $ poke ptr $ C'bz_stream
+    { c'bz_stream'next_in = nullPtr
+    , c'bz_stream'avail_in = 0
+    , c'bz_stream'total_in_lo32 = 0
+    , c'bz_stream'total_in_hi32 = 0
+    , c'bz_stream'next_out = outbuf
+    , c'bz_stream'avail_out = fromIntegral bufSize
+    , c'bz_stream'total_out_lo32 = 0
+    , c'bz_stream'total_out_hi32 = 0
+    , c'bz_stream'state = nullPtr
+    , c'bz_stream'bzalloc = nullPtr
+    , c'bz_stream'bzfree = nullPtr
+    , c'bz_stream'opaque = nullPtr
+    }
   _ <- lift $ allocate
     (throwErrnoIf_ (/= c'BZ_OK) "bzDecompressInit" $ c'BZ2_bzDecompressInit ptr 1 0)
     (\_ -> throwErrnoIf_ (/= c'BZ_OK) "bzDecompressEnd" $ c'BZ2_bzDecompressEnd ptr)
