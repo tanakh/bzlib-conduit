@@ -16,10 +16,9 @@ import Control.Monad.Trans.Resource
 import qualified Data.ByteString as S
 import Data.Conduit
 import Data.Default
+import Data.Maybe
 import Foreign
 import Foreign.C
-import System.IO
-import System.IO.Error
 
 import Data.Conduit.BZlib.Internal
 
@@ -83,16 +82,31 @@ getAvailOut ptr = do
     else do
     return Nothing
 
+fillInput :: Ptr C'bz_stream -> S.ByteString -> IO ()
+fillInput ptr bs = S.useAsCStringLen bs $ \(p, len) -> do
+  org <- (`plusPtr` (-bufSize)) <$> (peek $ p'bz_stream'next_in ptr)
+  let q = org `plusPtr` (bufSize - len)
+  copyBytes q p len
+  poke (p'bz_stream'avail_in ptr) $ fromIntegral len
+  poke (p'bz_stream'next_in ptr) q
+
+throwIfMinus :: String -> IO CInt -> IO CInt
+throwIfMinus s m = do
+  r <- m
+  when (r < 0) $ monadThrow $ userError $ s ++ ": " ++ show r
+  return r
+
 -- | Decompress (inflate) a stream of ByteStrings.
 decompress
   :: MonadResource m
      => DecompressParams -- ^ Decompress parameter
      -> Conduit S.ByteString m S.ByteString
 decompress param = do
-  (_, ptr) <- lift $ allocate malloc free
+  (_, ptr)    <- lift $ allocate malloc free
+  (_, inpbuf) <- lift $ allocate (mallocBytes bufSize) free
   (_, outbuf) <- lift $ allocate (mallocBytes bufSize) free
   liftIO $ poke ptr $ C'bz_stream
-    { c'bz_stream'next_in        = nullPtr
+    { c'bz_stream'next_in        = inpbuf `plusPtr` bufSize
     , c'bz_stream'avail_in       = 0
     , c'bz_stream'total_in_lo32  = 0
     , c'bz_stream'total_in_hi32  = 0
@@ -109,43 +123,30 @@ decompress param = do
     (throwErrnoIf_ (/= c'BZ_OK) "bzDecompressInit" $ c'BZ2_bzDecompressInit ptr 1 0)
     (\_ -> throwErrnoIf_ (/= c'BZ_OK) "bzDecompressEnd" $ c'BZ2_bzDecompressEnd ptr)
   go ptr
-  mbo <- liftIO $ getAvailOut ptr
-  case mbo of
-    Just out -> yield out
-    Nothing -> return ()
   where
     go ptr = do
-      mbo <- liftIO $ getAvailOut ptr
-      case mbo of
-        Just out -> do
-          yield out
-          cont <- liftIO $ decomp ptr
-          when cont $ go ptr
+      mbinp <- await
+      case mbinp of
         Nothing -> do
-          availIn <- liftIO $ peek $ p'bz_stream'avail_in ptr
-          if availIn > 0
-            then do
-            cont <- liftIO $ decomp ptr
-            -- liftIO $ hPrint stderr =<< peek ptr
-            when cont $ go ptr
-            else do
-            mbinp <- await
-            case mbinp of
-              Just inp -> do
-                cont <- liftIO $ S.useAsCStringLen inp $ \(p, len) -> do
-                  poke (p'bz_stream'next_in ptr) p
-                  poke (p'bz_stream'avail_in ptr) $ fromIntegral len
-                  -- hPrint stderr =<< peek ptr
-                  r <- decomp ptr
-                  -- hPrint stderr =<< peek ptr
-                  return r
-                when cont $ go ptr
-              Nothing -> do
-                lift $ monadThrow $ userError "invalid eof of input"
-
+          lift $ monadThrow $ userError "unexpected EOF on decompress"
+        Just inp -> do
+          liftIO $ fillInput ptr inp
+          cont <- yields ptr
+          when cont $ go ptr
+    
     decomp ptr = liftIO $ do
-      ret <- throwErrnoIf (< 0) "BZ2_bzDecompress" $ c'BZ2_bzDecompress ptr
+      ret <- throwIfMinus "BZ2_bzDecompress" $ c'BZ2_bzDecompress ptr
       return $ ret == c'BZ_OK
+
+    yields ptr = do
+      cont <- decomp ptr
+      mbo <- liftIO $ getAvailOut ptr
+      when (isJust mbo) $
+        yield $ fromJust mbo
+      availIn <- liftIO $ fromIntegral <$> (peek $ p'bz_stream'avail_in ptr)
+      if availIn > 0
+        then yields ptr
+        else return cont
 
 -- | bzip2 compression with default parameters.
 bzip2 :: MonadResource m => Conduit S.ByteString m S.ByteString

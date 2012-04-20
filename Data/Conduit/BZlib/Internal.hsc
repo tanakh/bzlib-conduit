@@ -26,6 +26,25 @@ module Data.Conduit.BZlib.Internal where
 #num BZ_OUTBUFF_FULL
 #num BZ_CONFIG_ERROR
 
+{-
+throwIfError_ :: Num a => a -> IO ()
+throwIfError_ a
+  | a >= 0 = return ()
+  | otherwise =
+    throwIO $ userError $ toString a
+  where
+    toString (#const BZ_SEQUENCE_ERROR) = "sequence error"
+    toString (#const BZ_PARAM_ERROR) = "sequence error"
+    toString (#const BZ_MEM_ERROR) = "sequence error"
+    toString (#const BZ_DATA_ERROR) = "sequence error"
+    toString (#const BZ_DATA_ERROR_MAGIC) = "sequence error"
+    toString (#const BZ_IO_ERROR) = "sequence error"
+    toString (#const BZ_UNEXPECTED_EOF) = "sequence error"
+    toString (#const BZ_OUTBUF_FULL) = "sequence error"
+    toString (#const BZ_CONFIG_ERROR) = "sequence error"
+    toString _ = "unknown error"
+-}
+
 #starttype bz_stream
 #field next_in,        Ptr CChar
 #field avail_in,       CUInt

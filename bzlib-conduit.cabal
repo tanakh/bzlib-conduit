@@ -46,3 +46,11 @@ test-suite test
                      , HUnit
                      , conduit == 0.4.*
                      , bzlib-conduit
+
+benchmark bench
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      bench
+  main-is:             bench.hs
+  build-depends:       base == 4.*
+                     , conduit
+                     , bzlib-conduit
