@@ -7,4 +7,5 @@ import System.Environment
 main :: IO ()
 main = do
   [file] <- getArgs
-  runResourceT $ sourceFile file =$= bunzip2 $$ sinkNull
+  runResourceT $ sourceFile file =$= bzip2 $$ sinkNull
+  -- runResourceT $ sourceFile file =$= bunzip2 $$ sinkNull
