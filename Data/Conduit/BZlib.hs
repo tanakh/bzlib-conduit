@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 module Data.Conduit.BZlib (
   compress,
   decompress,
@@ -34,17 +35,17 @@ data CompressParams
     }
 
 instance Default CompressParams where
-  def = CompressParam 9 0 30
+  def = CompressParams 9 0 30
 
 -- | Decompression parameters
 data DecompressParams
   = DecompressParams
     { dpVerbosity :: Int -- ^ Verbosity mode [0..4]. default is 0
-    , dpSmall     :: Int -- ^ If this is nonzero, use an algorithm uses less memory but slow. default is 0
+    , dpSmall     :: Bool -- ^ If True, use an algorithm uses less memory but slow. default is False
     }
 
 instance Default DecompressParams where
-  def = CompressParam 0 0
+  def = DecompressParams 0 False
 
 bufSize :: Int
 bufSize = 4096
@@ -82,16 +83,12 @@ throwIfMinus s m = do
 throwIfMinus_ :: String -> IO CInt -> IO ()
 throwIfMinus_ s m = CM.void $ throwIfMinus s m
 
--- | Compress a stream of ByteStrings.
-compress
-  :: MonadResource m
-     => CompressParams -- ^ Compress parameter
-     -> Conduit S.ByteString m S.ByteString
-compress CompressParams {..} = do
-  (_, ptr)    <- lift $ allocate malloc free
-  (_, inbuf)  <- lift $ allocate (mallocBytes bufSize >>= \p -> newIORef (p, bufSize))
-                                 (\mv -> readIORef mv >>= \(p, _) -> free p)
-  (_, outbuf) <- lift $ allocate (mallocBytes bufSize) free
+allocateStream :: MonadResource m => m (Ptr C'bz_stream, IORef (Ptr CChar, Int))
+allocateStream = do
+  (_, ptr)    <- allocate malloc free
+  (_, inbuf)  <- allocate (mallocBytes bufSize >>= \p -> newIORef (p, bufSize))
+                          (\mv -> readIORef mv >>= \(p, _) -> free p)
+  (_, outbuf) <- allocate (mallocBytes bufSize) free
   liftIO $ poke ptr $ C'bz_stream
     { c'bz_stream'next_in        = nullPtr
     , c'bz_stream'avail_in       = 0
@@ -106,8 +103,18 @@ compress CompressParams {..} = do
     , c'bz_stream'bzfree         = nullPtr
     , c'bz_stream'opaque         = nullPtr
     }
+  return (ptr, inbuf)
+
+-- | Compress a stream of ByteStrings.
+compress
+  :: MonadResource m
+     => CompressParams -- ^ Compress parameter
+     -> Conduit S.ByteString m S.ByteString
+compress CompressParams {..} = do
+  (ptr, inbuf) <- lift $ allocateStream
   _ <- lift $ allocate
-    (throwIfMinus_ "bzCompressInit" $ c'BZ2_bzCompressInit ptr cpBlockSize cpVerbosityLevel cpWorkFactor)
+    (throwIfMinus_ "bzCompressInit" $
+     c'BZ2_bzCompressInit ptr (fromIntegral cpBlockSize) (fromIntegral cpVerbosity) (fromIntegral cpWorkFactor))
     (\_ -> throwIfMinus_ "bzCompressEnd" $ c'BZ2_bzCompressEnd ptr)
   go ptr inbuf
   where
@@ -138,26 +145,10 @@ decompress
      => DecompressParams -- ^ Decompress parameter
      -> Conduit S.ByteString m S.ByteString
 decompress DecompressParams {..} = do
-  (_, ptr)    <- lift $ allocate malloc free
-  (_, inbuf)  <- lift $ allocate (mallocBytes bufSize >>= \p -> newIORef (p, bufSize))
-                                 (\mv -> readIORef mv >>= \(p, _) -> free p)
-  (_, outbuf) <- lift $ allocate (mallocBytes bufSize) free
-  liftIO $ poke ptr $ C'bz_stream
-    { c'bz_stream'next_in        = nullPtr
-    , c'bz_stream'avail_in       = 0
-    , c'bz_stream'total_in_lo32  = 0
-    , c'bz_stream'total_in_hi32  = 0
-    , c'bz_stream'next_out       = outbuf
-    , c'bz_stream'avail_out      = fromIntegral bufSize
-    , c'bz_stream'total_out_lo32 = 0
-    , c'bz_stream'total_out_hi32 = 0
-    , c'bz_stream'state          = nullPtr
-    , c'bz_stream'bzalloc        = nullPtr
-    , c'bz_stream'bzfree         = nullPtr
-    , c'bz_stream'opaque         = nullPtr
-    }
+  (ptr, inbuf) <- lift $ allocateStream
   _ <- lift $ allocate
-    (throwIfMinus_ "bzDecompressInit" $ c'BZ2_bzDecompressInit ptr dpVerbosityLevel dpSmall)
+    (throwIfMinus_ "bzDecompressInit" $
+     c'BZ2_bzDecompressInit ptr (fromIntegral dpVerbosity) (fromBool dpSmall))
     (\_ -> throwIfMinus_ "bzDecompressEnd" $ c'BZ2_bzDecompressEnd ptr)
   go ptr inbuf
   where
