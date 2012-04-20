@@ -26,15 +26,18 @@ library
                      , data-default
                      , bindings-DSL
 
-  include-dirs:        cbits
-  install-includes:    bzlib.h
-  c-sources:           cbits/blocksort.c
-                       cbits/huffman.c
-                       cbits/crctable.c
-                       cbits/randtable.c
-                       cbits/compress.c
-                       cbits/decompress.c
-                       cbits/bzlib.c
+  if !os(windows)
+    extra-libraries:    bz2
+  else
+    install-includes:    bzlib.h
+    include-dirs:        cbits
+    c-sources:           cbits/blocksort.c
+                         cbits/huffman.c
+                         cbits/crctable.c
+                         cbits/randtable.c
+                         cbits/compress.c
+                         cbits/decompress.c
+                         cbits/bzlib.c
 
 test-suite test
   type:                exitcode-stdio-1.0
