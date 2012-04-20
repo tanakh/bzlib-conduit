@@ -116,20 +116,19 @@ compress CompressParams {..} = do
     (throwIfMinus_ "bzCompressInit" $
      c'BZ2_bzCompressInit ptr (fromIntegral cpBlockSize) (fromIntegral cpVerbosity) (fromIntegral cpWorkFactor))
     (\_ -> throwIfMinus_ "bzCompressEnd" $ c'BZ2_bzCompressEnd ptr)
-  go ptr inbuf
-  where
-    go ptr inbuf = do
+
+  let loop = do
       mbinp <- await
       case mbinp of
-        Just inp | not (S.null inp) -> do
-          inSize' <- liftIO $ fillInput ptr inbuf inp
-          yields ptr c'BZ_RUN
-          go ptr inbuf
-        Just _ -> do
-          go ptr inbuf
+        Just inp -> do
+          when (not $ S.null inp) $ do
+            liftIO $ fillInput ptr inbuf inp
+            yields ptr c'BZ_RUN
+          loop
         Nothing -> do
           yields ptr c'BZ_FINISH
-
+  loop
+  where
     yields ptr action = do
       cont <- liftIO $ throwIfMinus "bzCompress" $ c'BZ2_bzCompress ptr action
       mbout <- liftIO $ getAvailOut ptr
@@ -150,33 +149,29 @@ decompress DecompressParams {..} = do
     (throwIfMinus_ "bzDecompressInit" $
      c'BZ2_bzDecompressInit ptr (fromIntegral dpVerbosity) (fromBool dpSmall))
     (\_ -> throwIfMinus_ "bzDecompressEnd" $ c'BZ2_bzDecompressEnd ptr)
-  go ptr inbuf
-  where
-    go ptr inbuf = do
+  
+  let loop = do
       mbinp <- await
       case mbinp of
         Just inp | not (S.null inp) -> do
           liftIO $ fillInput ptr inbuf inp
           cont <- yields ptr
-          when cont $ go ptr inbuf
+          when cont $ loop
         Just _ -> do
-          go ptr inbuf
+          loop
         Nothing -> do
           lift $ monadThrow $ userError "unexpected EOF on decompress"
-    
-    decomp ptr = liftIO $ do
-      ret <- throwIfMinus "BZ2_bzDecompress" $ c'BZ2_bzDecompress ptr
-      return $ ret == c'BZ_OK
-
+  loop
+  where
     yields ptr = do
-      cont <- decomp ptr
+      ret <- liftIO $ throwIfMinus "BZ2_bzDecompress" $ c'BZ2_bzDecompress ptr
       mbout <- liftIO $ getAvailOut ptr
       when (isJust mbout) $
         yield $ fromJust mbout
       availIn <- liftIO $ fromIntegral <$> (peek $ p'bz_stream'avail_in ptr)
       if availIn > 0
         then yields ptr
-        else return cont
+        else return $ ret == c'BZ_OK
 
 -- | bzip2 compression with default parameters.
 bzip2 :: MonadResource m => Conduit S.ByteString m S.ByteString
