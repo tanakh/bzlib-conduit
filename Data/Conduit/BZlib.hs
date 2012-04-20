@@ -10,7 +10,7 @@ module Data.Conduit.BZlib (
   ) where
 
 import Control.Applicative
-import Control.Monad
+import Control.Monad as CM
 import Control.Monad.Trans
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as S
@@ -19,6 +19,7 @@ import Data.Default
 import Data.Maybe
 import Foreign
 import Foreign.C
+import System.IO
 
 import Data.Conduit.BZlib.Internal
 
@@ -26,44 +27,6 @@ data CompressParams = CompressParams
 instance Default CompressParams where
 data DecompressParams = DecompressParams
 instance Default DecompressParams where
-
--- | Compress (deflate) a stream of ByteStrings.
-compress
-  :: MonadResource m
-     => CompressParams -- ^ Compress parameter
-     -> Conduit S.ByteString m S.ByteString
-compress param = do
-  undefined
-{-
-  (_, bzs) <- lift $ allocate (c'BZ2_bzCompressInit 1 1 1) c'BZ2_bzComp
-  running bzs
-  where
-    running bzs = do
-      mb <- await
-      case mb of
-        Just dat -> do
-          liftIO $ do
-            setInput bzs dat
-            compressFlush bzs
-          flushing bzs
-        Nothing -> do
-          compressFinish bzs
-          finishing bzs
-    
-    flushing bzs = do
-      out <- liftIO $ getOutput bzs
-      yield out
-      cont <- compressFlush bzs
-      if cont
-        then flushing bzs
-        else running bzs
-    
-    finishing bzs = do
-      out <- liftIO $ getOutput bzs
-      yield out
-      cont <- compressFinish bzs
-      when cont $ finishing bzs
--}
 
 bufSize :: Int
 bufSize = 4096
@@ -96,7 +59,57 @@ throwIfMinus s m = do
   when (r < 0) $ monadThrow $ userError $ s ++ ": " ++ show r
   return r
 
--- | Decompress (inflate) a stream of ByteStrings.
+throwIfMinus_ :: String -> IO CInt -> IO ()
+throwIfMinus_ s m = CM.void $ throwIfMinus s m
+
+-- | Compress a stream of ByteStrings.
+compress
+  :: MonadResource m
+     => CompressParams -- ^ Compress parameter
+     -> Conduit S.ByteString m S.ByteString
+compress param = do
+  (_, ptr)    <- lift $ allocate malloc free
+  (_, inpbuf) <- lift $ allocate (mallocBytes bufSize) free
+  (_, outbuf) <- lift $ allocate (mallocBytes bufSize) free
+  liftIO $ poke ptr $ C'bz_stream
+    { c'bz_stream'next_in        = inpbuf `plusPtr` bufSize
+    , c'bz_stream'avail_in       = 0
+    , c'bz_stream'total_in_lo32  = 0
+    , c'bz_stream'total_in_hi32  = 0
+    , c'bz_stream'next_out       = outbuf
+    , c'bz_stream'avail_out      = fromIntegral bufSize
+    , c'bz_stream'total_out_lo32 = 0
+    , c'bz_stream'total_out_hi32 = 0
+    , c'bz_stream'state          = nullPtr
+    , c'bz_stream'bzalloc        = nullPtr
+    , c'bz_stream'bzfree         = nullPtr
+    , c'bz_stream'opaque         = nullPtr
+    }
+  _ <- lift $ allocate
+    (throwIfMinus_ "bzCompressInit" $ c'BZ2_bzCompressInit ptr 1 0 30)
+    (\_ -> throwIfMinus_ "bzCompressEnd" $ c'BZ2_bzCompressEnd ptr)
+  go ptr
+  where
+    go ptr = do
+      mbinp <- await
+      case mbinp of
+        Just inp -> do
+          liftIO $ fillInput ptr inp
+          yields ptr c'BZ_RUN
+          go ptr
+        Nothing -> do
+          yields ptr c'BZ_FINISH
+          
+    yields ptr action = do
+      cont <- liftIO $ throwIfMinus "bzCompress" $ c'BZ2_bzCompress ptr action
+      mbout <- liftIO $ getAvailOut ptr
+      when (isJust mbout) $
+        yield $ fromJust mbout
+      availIn <- liftIO $ fromIntegral <$> (peek $ p'bz_stream'avail_in ptr)
+      when (availIn > 0 || action == c'BZ_FINISH && cont /= c'BZ_STREAM_END) $
+        yields ptr action
+
+-- | Decompress a stream of ByteStrings.
 decompress
   :: MonadResource m
      => DecompressParams -- ^ Decompress parameter
@@ -120,8 +133,8 @@ decompress param = do
     , c'bz_stream'opaque         = nullPtr
     }
   _ <- lift $ allocate
-    (throwErrnoIf_ (/= c'BZ_OK) "bzDecompressInit" $ c'BZ2_bzDecompressInit ptr 1 0)
-    (\_ -> throwErrnoIf_ (/= c'BZ_OK) "bzDecompressEnd" $ c'BZ2_bzDecompressEnd ptr)
+    (throwIfMinus_ "bzDecompressInit" $ c'BZ2_bzDecompressInit ptr 1 0)
+    (\_ -> throwIfMinus_ "bzDecompressEnd" $ c'BZ2_bzDecompressEnd ptr)
   go ptr
   where
     go ptr = do
@@ -140,9 +153,9 @@ decompress param = do
 
     yields ptr = do
       cont <- decomp ptr
-      mbo <- liftIO $ getAvailOut ptr
-      when (isJust mbo) $
-        yield $ fromJust mbo
+      mbout <- liftIO $ getAvailOut ptr
+      when (isJust mbout) $
+        yield $ fromJust mbout
       availIn <- liftIO $ fromIntegral <$> (peek $ p'bz_stream'avail_in ptr)
       if availIn > 0
         then yields ptr
