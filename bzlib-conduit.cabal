@@ -13,6 +13,7 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 data-files:          test/*.bz2
+                     test/*.ref
 
 source-repository head
   type:                git
@@ -33,7 +34,7 @@ library
   if !os(windows)
     extra-libraries:    bz2
   else
-    install-includes:    bzlib.h
+    install-includes:    bzlib.h, bzlib_private.h
     include-dirs:        cbits
     c-sources:           cbits/blocksort.c
                          cbits/huffman.c
