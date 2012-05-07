@@ -50,7 +50,7 @@ test-suite test
   main-is:             test.hs
   build-depends:       base == 4.*
                      , bytestring == 0.9.*
-                     , hspec == 1.0.*
+                     , hspec >= 1.0 && < 1.2
                      , HUnit
                      , QuickCheck
                      , random
