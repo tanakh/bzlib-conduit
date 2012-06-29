@@ -2,10 +2,10 @@
 module Data.Conduit.BZlib (
   compress,
   decompress,
-  
+
   bzip2,
   bunzip2,
-  
+
   CompressParams(..),
   DecompressParams(..),
   def,
@@ -114,7 +114,10 @@ compress CompressParams {..} = do
   (ptr, inbuf) <- lift $ allocateStream
   _ <- lift $ allocate
     (throwIfMinus_ "bzCompressInit" $
-     c'BZ2_bzCompressInit ptr (fromIntegral cpBlockSize) (fromIntegral cpVerbosity) (fromIntegral cpWorkFactor))
+     c'BZ2_bzCompressInit ptr
+     (fromIntegral cpBlockSize)
+     (fromIntegral cpVerbosity)
+     (fromIntegral cpWorkFactor))
     (\_ -> throwIfMinus_ "bzCompressEnd" $ c'BZ2_bzCompressEnd ptr)
 
   let loop = do
@@ -149,7 +152,7 @@ decompress DecompressParams {..} = do
     (throwIfMinus_ "bzDecompressInit" $
      c'BZ2_bzDecompressInit ptr (fromIntegral dpVerbosity) (fromBool dpSmall))
     (\_ -> throwIfMinus_ "bzDecompressEnd" $ c'BZ2_bzDecompressEnd ptr)
-  
+
   let loop = do
       mbinp <- await
       case mbinp of
