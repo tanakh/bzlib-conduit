@@ -1,5 +1,5 @@
 name:                bzlib-conduit
-version:             0.1.0.1
+version:             0.2.0.0
 synopsis:            Streaming compression/decompression via conduits.
 description:         Streaming compression/decompression via conduits.
 homepage:            https://github.com/tanakh/bzlib-conduit
@@ -26,7 +26,7 @@ library
   build-depends:       base == 4.*
                      , bytestring == 0.9.*
                      , mtl == 2.*
-                     , conduit == 0.4.*
+                     , conduit == 0.5.*
                      , resourcet
                      , data-default
                      , bindings-DSL
@@ -49,12 +49,12 @@ test-suite test
   hs-source-dirs:      test
   main-is:             test.hs
   build-depends:       base == 4.*
-                     , bytestring == 0.9.*
-                     , hspec >= 1.0 && < 1.2
+                     , bytestring
+                     , hspec >= 1.2
                      , HUnit
                      , QuickCheck
                      , random
-                     , conduit == 0.4.*
+                     , conduit
                      , bzlib-conduit
 
 benchmark bench
