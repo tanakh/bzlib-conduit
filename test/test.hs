@@ -11,7 +11,6 @@ import System.Random
 
 import Test.Hspec
 import Test.Hspec.QuickCheck
-import Test.HUnit
 import Test.QuickCheck
 import Test.QuickCheck.Property
 
@@ -25,7 +24,7 @@ main = hspec $ do
         dec <- runResourceT $ do
           sourceFile ("test/" ++ file ++ ".bz2") =$= bunzip2 $$ B.take (10^9)
         ref <- L.readFile ("test/" ++ file ++ ".ref")
-        assert $ dec == ref
+        dec `shouldBe` ref
 
   describe "compress" $ do
     prop ". decompress == id" $ \((`mod` (2^16)) . abs -> n) -> do
