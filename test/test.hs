@@ -9,8 +9,7 @@ import Data.Conduit.BZlib
 import Data.Conduit.List as C
 import System.Random
 
-import Test.Hspec.Monadic
-import Test.Hspec.HUnit
+import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.HUnit
 import Test.QuickCheck
