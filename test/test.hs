@@ -36,4 +36,4 @@ main = hspec $ do
               <$> replicateM (abs n) randomIO
         dest <- runResourceT $ do
           C.sourceList (P.map S.pack ss) =$= bzip2 =$= bunzip2 $$ B.take (10^9)
-        return $ dest == L.pack (concat ss)
+        return $ dest == L.pack (P.concat ss)
