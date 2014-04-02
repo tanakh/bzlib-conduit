@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Conduit
