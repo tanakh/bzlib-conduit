@@ -2,11 +2,11 @@ name:                bzlib-conduit
 version:             0.2.1.1
 synopsis:            Streaming compression/decompression via conduits.
 description:         Streaming compression/decompression via conduits.
-homepage:            https://github.com/tanakh/bzlib-conduit
+homepage:            https://github.com/snoyberg/bzlib-conduit
 license:             BSD3
 license-file:        LICENSE
 author:              Hideyuki Tanaka
-maintainer:          tanaka.hideyuki@gmail.com
+maintainer:          Michael Snoyman
 copyright:           (c) 2012, Hideyuki Tanaka
 category:            Codec
 build-type:          Simple
@@ -17,7 +17,7 @@ data-files:          test/*.bz2
 
 source-repository head
   type:                git
-  location:            git://github.com/tanakh/bzlib-conduit.git
+  location:            git://github.com/snoyberg/bzlib-conduit.git
 
 library
   exposed-modules:     Data.Conduit.BZlib
