@@ -34,7 +34,7 @@ main = hspec $ do
         ss <- P.takeWhile (not. null)
               . P.map (P.take bsize)
               . P.iterate (P.drop bsize)
-              <$> replicateM (abs n) randomIO
+              <$> Control.Monad.replicateM (abs n) randomIO
         dest <- runResourceT $ do
           C.sourceList (P.map S.pack ss) =$= bzip2 =$= bunzip2 $$ B.take (10^9)
         return $ dest == L.pack (P.concat ss)
