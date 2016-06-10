@@ -1,3 +1,4 @@
+import Control.Monad.Trans.Resource
 import Data.Conduit
 import Data.Conduit.Binary
 import Data.Conduit.List as C
