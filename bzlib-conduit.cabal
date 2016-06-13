@@ -67,3 +67,4 @@ benchmark bench
                      , conduit
                      , conduit-extra
                      , bzlib-conduit
+                     , resourcet
