@@ -120,15 +120,15 @@ compress CompressParams {..} = do
     (\_ -> throwIfMinus_ "bzCompressEnd" $ c'BZ2_bzCompressEnd ptr)
 
   let loop = do
-      mbinp <- await
-      case mbinp of
-        Just inp -> do
-          when (not $ S.null inp) $ do
-            liftIO $ fillInput ptr inbuf inp
-            yields ptr c'BZ_RUN
-          loop
-        Nothing -> do
-          yields ptr c'BZ_FINISH
+        mbinp <- await
+        case mbinp of
+          Just inp -> do
+            when (not $ S.null inp) $ do
+              liftIO $ fillInput ptr inbuf inp
+              yields ptr c'BZ_RUN
+            loop
+          Nothing -> do
+            yields ptr c'BZ_FINISH
   loop
   where
     yields ptr action = do
@@ -153,16 +153,16 @@ decompress DecompressParams {..} = do
     (\_ -> throwIfMinus_ "bzDecompressEnd" $ c'BZ2_bzDecompressEnd ptr)
 
   let loop = do
-      mbinp <- await
-      case mbinp of
-        Just inp | not (S.null inp) -> do
-          liftIO $ fillInput ptr inbuf inp
-          cont <- yields ptr
-          when cont $ loop
-        Just _ -> do
-          loop
-        Nothing -> do
-          liftIO $ throwM $ userError "unexpected EOF on decompress"
+        mbinp <- await
+        case mbinp of
+          Just inp | not (S.null inp) -> do
+            liftIO $ fillInput ptr inbuf inp
+            cont <- yields ptr
+            when cont $ loop
+          Just _ -> do
+            loop
+          Nothing -> do
+            liftIO $ throwM $ userError "unexpected EOF on decompress"
   loop
   where
     yields ptr = do
