@@ -24,11 +24,11 @@ library
   exposed-modules:     Data.Conduit.BZlib
   other-modules:       Data.Conduit.BZlib.Internal
 
-  build-depends:       base == 4.*
+  build-depends:       base >= 4.9 && < 10
                      , bytestring >=0.9
                      , mtl >= 2.0
                      , conduit >= 1.3
-                     , resourcet
+                     , resourcet >= 1.2
                      , data-default
                      , bindings-DSL
 
@@ -49,7 +49,7 @@ test-suite test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             test.hs
-  build-depends:       base == 4.*
+  build-depends:       base
                      , bytestring
                      , hspec >= 1.3
                      , QuickCheck
@@ -62,7 +62,7 @@ benchmark bench
   type:                exitcode-stdio-1.0
   hs-source-dirs:      bench
   main-is:             bench.hs
-  build-depends:       base == 4.*
+  build-depends:       base
                      , conduit
                      , bzlib-conduit
                      , resourcet
