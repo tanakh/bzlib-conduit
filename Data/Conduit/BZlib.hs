@@ -11,7 +11,6 @@ module Data.Conduit.BZlib (
   def,
   ) where
 
-import Control.Applicative
 import Control.Monad as CM
 import Control.Monad.Trans
 import Control.Monad.Trans.Resource
@@ -67,7 +66,7 @@ getAvailOut ptr = do
 fillInput :: Ptr C'bz_stream -> IORef (Ptr CChar, Int) -> S.ByteString -> IO ()
 fillInput ptr mv bs = S.unsafeUseAsCStringLen bs $ \(p, len) -> do
   (buf, bsize) <- readIORef mv
-  let nsize = head [ s | x <- [0..], let s = bsize * 2 ^ x, s >= len ]
+  let nsize = head [ s | x <- [0..], let s = bsize * 2 ^ (x :: Int), s >= len ]
   nbuf <- if nsize >= bsize then reallocBytes buf nsize else return buf
   copyBytes nbuf p len
   poke (p'bz_stream'avail_in ptr) $ fromIntegral len
@@ -77,7 +76,7 @@ fillInput ptr mv bs = S.unsafeUseAsCStringLen bs $ \(p, len) -> do
 throwIfMinus :: String -> IO CInt -> IO CInt
 throwIfMinus s m = do
   r <- m
-  when (r < 0) $ monadThrow $ userError $ s ++ ": " ++ show r
+  when (r < 0) $ throwM $ userError $ s ++ ": " ++ show r
   return r
 
 throwIfMinus_ :: String -> IO CInt -> IO ()
@@ -109,7 +108,7 @@ allocateStream = do
 compress
   :: MonadResource m
      => CompressParams -- ^ Compress parameter
-     -> Conduit S.ByteString m S.ByteString
+     -> ConduitT S.ByteString S.ByteString m ()
 compress CompressParams {..} = do
   (ptr, inbuf) <- lift $ allocateStream
   _ <- lift $ allocate
@@ -137,7 +136,7 @@ compress CompressParams {..} = do
       mbout <- liftIO $ getAvailOut ptr
       when (isJust mbout) $
         yield $ fromJust mbout
-      availIn <- liftIO $ fromIntegral <$> (peek $ p'bz_stream'avail_in ptr)
+      availIn <- liftIO $ peek $ p'bz_stream'avail_in ptr
       when (availIn > 0 || action == c'BZ_FINISH && cont /= c'BZ_STREAM_END) $
         yields ptr action
 
@@ -145,7 +144,7 @@ compress CompressParams {..} = do
 decompress
   :: MonadResource m
      => DecompressParams -- ^ Decompress parameter
-     -> Conduit S.ByteString m S.ByteString
+     -> ConduitT S.ByteString S.ByteString m ()
 decompress DecompressParams {..} = do
   (ptr, inbuf) <- lift $ allocateStream
   _ <- lift $ allocate
@@ -163,7 +162,7 @@ decompress DecompressParams {..} = do
         Just _ -> do
           loop
         Nothing -> do
-          lift $ monadThrow $ userError "unexpected EOF on decompress"
+          liftIO $ throwM $ userError "unexpected EOF on decompress"
   loop
   where
     yields ptr = do
@@ -171,15 +170,15 @@ decompress DecompressParams {..} = do
       mbout <- liftIO $ getAvailOut ptr
       when (isJust mbout) $
         yield $ fromJust mbout
-      availIn <- liftIO $ fromIntegral <$> (peek $ p'bz_stream'avail_in ptr)
+      availIn <- liftIO $ peek $ p'bz_stream'avail_in ptr
       if availIn > 0
         then yields ptr
         else return $ ret == c'BZ_OK
 
 -- | bzip2 compression with default parameters.
-bzip2 :: MonadResource m => Conduit S.ByteString m S.ByteString
+bzip2 :: MonadResource m => ConduitT S.ByteString S.ByteString m ()
 bzip2 = compress def
 
 -- | bzip2 decompression with default parameters.
-bunzip2 :: MonadResource m => Conduit S.ByteString m S.ByteString
+bunzip2 :: MonadResource m => ConduitT S.ByteString S.ByteString m ()
 bunzip2 = decompress def
