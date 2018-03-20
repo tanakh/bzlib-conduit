@@ -17,7 +17,7 @@ import Control.Monad.Trans.Resource
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Unsafe as S
 import Data.Conduit
-import Data.Default
+import Data.Default.Class
 import Data.Maybe
 import Data.IORef
 import Foreign
