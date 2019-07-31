@@ -15,7 +15,7 @@ import Prelude as P
 main :: IO ()
 main = hspec $ do
   describe "decompress" $ do
-    forM_ ["sample1", "sample2", "sample3"] $ \file -> do
+    forM_ ["sample1", "sample2", "sample3", "sample4"] $ \file -> do
       it ("correctly " ++ file ++ ".bz2") $ do
         dec <- runConduitRes
              $ sourceFile ("test/" ++ file ++ ".bz2")
