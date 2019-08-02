@@ -50,19 +50,17 @@ instance Default DecompressParams where
 bufSize :: Int
 bufSize = 4096
 
-getAvailOut :: Ptr C'bz_stream -> IO (Maybe S.ByteString)
-getAvailOut ptr = do
+yieldAvailOutput :: MonadIO m => Ptr C'bz_stream -> ConduitT S.ByteString S.ByteString m ()
+yieldAvailOutput ptr = do
   availOut <- liftIO $ fromIntegral <$> (peek $ p'bz_stream'avail_out ptr)
-  if availOut < bufSize
-    then do
-      let len = bufSize - availOut
-      p <- (`plusPtr` (-len)) <$> (peek $ p'bz_stream'next_out ptr)
-      out <- S.packCStringLen (p, fromIntegral len)
-      poke (p'bz_stream'next_out ptr) p
-      poke (p'bz_stream'avail_out ptr) (fromIntegral bufSize)
-      return $ Just out
-    else do
-    return Nothing
+  when (availOut < bufSize) $
+    yieldM $ liftIO $ do
+          let len = bufSize - availOut
+          p <- (`plusPtr` (-len)) <$> (peek $ p'bz_stream'next_out ptr)
+          out <- S.packCStringLen (p, fromIntegral len)
+          poke (p'bz_stream'next_out ptr) p
+          poke (p'bz_stream'avail_out ptr) (fromIntegral bufSize)
+          return out
 
 fillInput :: Ptr C'bz_stream -> IORef (Ptr CChar, Int) -> S.ByteString -> IO ()
 fillInput ptr mv bs = S.unsafeUseAsCStringLen bs $ \(p, len) -> do
@@ -135,9 +133,7 @@ compress CompressParams {..} = do
     yields :: MonadIO m => Ptr C'bz_stream -> CInt -> ConduitT S.ByteString S.ByteString m ()
     yields ptr action = do
       cont <- liftIO $ throwIfMinus "bzCompress" $ c'BZ2_bzCompress ptr action
-      mbout <- liftIO $ getAvailOut ptr
-      when (isJust mbout) $
-        yield $ fromJust mbout
+      yieldAvailOutput ptr
       availIn <- liftIO $ peek $ p'bz_stream'avail_in ptr
       when (availIn > 0 || action == c'BZ_FINISH && cont /= c'BZ_STREAM_END) $
         yields ptr action
@@ -171,9 +167,7 @@ decompress1 DecompressParams {..} = do
   where
     yields ptr = do
       ret <- liftIO $ throwIfMinus "BZ2_bzDecompress" $ c'BZ2_bzDecompress ptr
-      mbout <- liftIO $ getAvailOut ptr
-      when (isJust mbout) $
-        yield $ fromJust mbout
+      yieldAvailOutput ptr
       availIn <- liftIO $ peek $ p'bz_stream'avail_in ptr
       if availIn > 0
         then
