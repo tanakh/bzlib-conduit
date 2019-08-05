@@ -1,4 +1,7 @@
+# ChangeLog for bzlib-conduit
+
 ## 0.3.0.2
+
 * Fix handling of concatenated bzip2 files
 
 ## 0.3.0.1
