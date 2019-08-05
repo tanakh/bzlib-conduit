@@ -1,3 +1,6 @@
+## 0.3.0.2
+* Fix handling of concatenated bzip2 files
+
 ## 0.3.0.1
 
 * Reduce dep to `data-default-class` [#6](https://github.com/snoyberg/bzlib-conduit/pull/6)
