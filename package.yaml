@@ -1,0 +1,64 @@
+name:        bzlib-conduit
+version:     0.3.0.2
+synopsis:    Streaming compression/decompression via conduits.
+description: Please see the README and docs at <https://www.stackage.org/package/bzlib-conduit>
+category:    Codec
+author:      Hideyuki Tanaka
+maintainer:  Michael Snoyman
+copyright:   (c) 2012, Hideyuki Tanaka
+license:     BSD3
+github:      snoyberg/bzlib-conduit
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+dependencies:
+- base >=4.9 && <10
+- bytestring >= 0.9
+- mtl >= 2.0
+- conduit >= 1.3
+- resourcet >= 1.2
+- data-default-class
+- bindings-DSL
+
+library:
+  source-dirs: src
+  when:
+  - condition: "!(os(windows))"
+    then:
+      extra-libraries: bz2
+    else:
+      c-sources:
+      - cbits/blocksort.c
+      - cbits/huffman.c
+      - cbits/crctable.c
+      - cbits/randtable.c
+      - cbits/compress.c
+      - cbits/decompress.c
+      - cbits/bzlib.c
+      include-dirs:
+      - cbits
+      install-includes:
+      - bzlib.h
+      - bzlib_private.h
+
+tests:
+  test:
+    main: test.hs
+    source-dirs: test
+    dependencies:
+    - hspec >=1.3
+    - random
+    - bzlib-conduit
+
+benchmarks:
+  bench:
+    main: bench.hs
+    source-dirs: bench
+    dependencies:
+    - bzlib-conduit
+
+data-files:
+- test/*.bz2
+- test/*.ref

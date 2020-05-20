@@ -1,11 +1,8 @@
-import Data.Conduit
-import Data.Conduit.Binary
-import Data.Conduit.List as C
+import Conduit
 import Data.Conduit.BZlib
 import System.Environment
 
 main :: IO ()
 main = do
   [file] <- getArgs
-  runResourceT $ sourceFile file =$= bzip2 $$ sinkNull
-  -- runResourceT $ sourceFile file =$= bunzip2 $$ sinkNull
+  runConduitRes $ sourceFile file .| bzip2 .| sinkNull
